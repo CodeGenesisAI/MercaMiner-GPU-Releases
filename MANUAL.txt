@@ -7,7 +7,7 @@ cards through OpenCL. It mines SOLO against your own Mercatura Core node:
 every block you find pays the whole block reward straight to your wallet.
 There is no pool and no fee.
 
-Everything can be set on one command line, like SRBMiner:
+Everything can be set on one command line:
 
   Windows:
     mercaminer-gpu.exe --algorithm mercahash --pool http://192.168.1.100:27775 ^
@@ -57,8 +57,8 @@ NEW IN v0.5.1 (AMD cards):
   * --gpu-max-temp now works on AMD cards on Linux (read from the amdgpu
     driver). On Windows it still works on NVIDIA cards only.
   * Temperature, power, clocks and fan of AMD cards on Linux appear in the
-    status lines, the SRBMiner-style table and the API.
-  * The SRBMiner-style table numbers cards the way mining OSes do (NVIDIA
+    status lines, the mining-OS table and the API.
+  * The mining-OS table numbers cards the way mining OSes do (NVIDIA
     first, then AMD, each in PCI slot order), so mixed rigs show each
     card's hashrate on the right card.
   * The automatic lane count leaves more memory free on AMD cards
@@ -455,8 +455,7 @@ NEW IN v0.5.1 (AMD cards):
       Config key: api_enable=true
 
   --api-port PORT
-      Port of the statistics API. Default 21550 (the same default as
-      SRBMiner). Use a different port per miner if several run on one
+      Port of the statistics API. Default 21550. Use a different port per miner if several run on one
       computer. If the port is already taken the miner stops with a
       message instead of running without its API.
       Config key: api_port
@@ -492,10 +491,10 @@ NEW IN v0.5.1 (AMD cards):
                           power, fan_speed, core_clock, memory_clock,
                           efficiency, live_checked, live_errors,
                           paused_hot, disabled
-      algorithms[]        the same totals in SRBMiner's layout
+      algorithms[]        the same totals in a second layout
                           (hashrate.gpu.gpu0, hashrate.gpu.total,
                           shares.accepted/rejected) for tools that
-                          already read SRBMiner. Here a "share" is a block.
+                          already read that layout. Here a "share" is a block.
 
 
 ------------------------------------------------------------------------------
@@ -612,7 +611,7 @@ NEW IN v0.5.1 (AMD cards):
   --threads N                   CPU threads for --backend cpu. (threads)
   --config FILE  (also --config-file)   Read settings from FILE instead of
       searching for mercaminer.conf.
-  --disable-cpu                 Accepted for SRBMiner-style launchers; has
+  --disable-cpu                 Accepted for mining-OS launchers; has
       no effect (the GPU backend never mines on the CPU).
 
 
@@ -678,7 +677,7 @@ NEW IN v0.5.1 (AMD cards):
       current clocks - lower its core clock. The block re-check means
       nothing bad is ever submitted, but the GPU is wasting work.
 
-  After those lines comes a table in SRBMiner's console format, for
+  After those lines comes a table in a common console format, for
   mining OSes and dashboards that read the miner's screen output:
 
   #0  RTX 2070  98.90 H/s  104.0W  0.951  75%  59C  1905  6801  1  0  0

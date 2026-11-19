@@ -22,10 +22,10 @@ DLLs. Unzip or untar it and run.
 
 - MercaHash **V1 and V2**, with an automatic switch at the fork height
 - **Solo** mining straight to your own Mercatura Core node — every block pays the full reward to your wallet, no pool, no fee
-- **SRBMiner-style** single command line, per-GPU settings, optional config file
+- **Single-line** command style, per-GPU settings, optional config file
 - **NVIDIA + AMD**, multiple GPUs, automatic VRAM sizing
 - NVIDIA core/memory clock, power and fan control; per-GPU **temperature pause** (NVIDIA, and AMD on Linux)
-- **JSON statistics API** and SRBMiner-format console output — works with HiveOS-style mining OSes and dashboards
+- **JSON statistics API** and a standard console output format — works with HiveOS-style mining OSes and dashboards
 - Safety built in: GPU self-test against the official vectors at every start, CPU re-check of every found block, automatic recovery
 - Tools: `gpu-autotune`, `gpu-bench`, `gpu-stress`
 
@@ -51,7 +51,7 @@ DLLs. Unzip or untar it and run.
 ### Mining OS / flight sheets
 
 Put the command line in the flight sheet's arguments field; the dashboard reads
-the hashrate from the miner's SRBMiner-format output or its JSON API (port
+the hashrate from the miner's console output or its JSON API (port
 21550). Set clocks **either** in the mining OS **or** with the miner's
 `--gpu-cclock` / `--gpu-fan` options, not both.
 
