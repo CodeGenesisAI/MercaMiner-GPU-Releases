@@ -8,8 +8,8 @@ user manual. It does not contain source code.
 
 | Platform | File |
 | --- | --- |
-| Windows (64-bit) | [`MercaMiner-GPU-v0.5.4-win64.zip`](downloads/v0.5.6/MercaMiner-GPU-v0.5.4-win64.zip) |
-| Linux (64-bit) | [`MercaMiner-GPU-v0.5.4-linux-x64.tar.gz`](downloads/v0.5.6/MercaMiner-GPU-v0.5.4-linux-x64.tar.gz) |
+| Windows (64-bit) | [`MercaMiner-GPU-v0.5.6-win64.zip`](downloads/v0.5.6/MercaMiner-GPU-v0.5.6-win64.zip) |
+| Linux (64-bit) | [`MercaMiner-GPU-v0.5.6-linux-x64.tar.gz`](downloads/v0.5.6/MercaMiner-GPU-v0.5.6-linux-x64.tar.gz) |
 
 SHA-256 checksums: [`downloads/v0.5.6/SHA256SUMS.txt`](downloads/v0.5.6/SHA256SUMS.txt).
 On the file's page, use the **Download raw file** button (the download icon).
