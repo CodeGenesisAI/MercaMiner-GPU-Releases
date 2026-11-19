@@ -25,7 +25,7 @@ DLLs. Unzip or untar it and run.
 - **SRBMiner-style** single command line, per-GPU settings, optional config file
 - **NVIDIA + AMD**, multiple GPUs, automatic VRAM sizing
 - NVIDIA core/memory clock, power and fan control; per-GPU **temperature pause** (NVIDIA, and AMD on Linux)
-- **JSON statistics API** and SRBMiner-format console output — works with MatrixMinerOS / MatrixMinerUI and similar dashboards
+- **JSON statistics API** and SRBMiner-format console output — works with HiveOS-style mining OSes and dashboards
 - Safety built in: GPU self-test against the official vectors at every start, CPU re-check of every found block, automatic recovery
 - Tools: `gpu-autotune`, `gpu-bench`, `gpu-stress`
 
@@ -48,7 +48,7 @@ DLLs. Unzip or untar it and run.
    `start-mining.bat` (`start-mining-admin.bat` for clock control). On Linux,
    edit `start.sh`.
 
-### MatrixMinerOS / MatrixMinerUI
+### Mining OS / flight sheets
 
 Put the command line in the flight sheet's arguments field; the dashboard reads
 the hashrate from the miner's SRBMiner-format output or its JSON API (port
