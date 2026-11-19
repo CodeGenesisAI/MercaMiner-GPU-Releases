@@ -1,0 +1,756 @@
+==============================================================================
+ MercaMiner GPU v0.5.4 - Mercatura (MCA) MercaHash V1 + V2 GPU miner
+==============================================================================
+
+MercaMiner GPU mines Mercatura (MCA) with NVIDIA, AMD and Intel graphics
+cards through OpenCL. It mines SOLO against your own Mercatura Core node:
+every block you find pays the whole block reward straight to your wallet.
+There is no pool and no fee.
+
+Everything can be set on one command line, like SRBMiner:
+
+  Windows:
+    mercaminer-gpu.exe --algorithm mercahash --pool http://192.168.1.100:27775 ^
+      --wallet tmca1YOUR_ADDRESS --password miner:YOUR_RPC_PASSWORD
+
+  Linux:
+    ./mercaminer --algorithm mercahash --pool http://192.168.1.100:27775 \
+      --wallet tmca1YOUR_ADDRESS --password miner:YOUR_RPC_PASSWORD
+
+The program is called mercaminer-gpu.exe on Windows and mercaminer on Linux.
+Everything else in this file is the same on both.
+
+MERCAHASH V1 AND V2. Mercatura Core v0.1.3 switches the public testnet from
+MercaHash V1 (128 MiB per hash) to MercaHash V2 (16 MiB per hash) at block
+17,000. The miner switches by itself: it mines V1 below that block and
+recompiles and self-tests the GPUs for V2 when the first V2 block comes up
+(this takes a few seconds), with no restart. V2 fits 8x more lanes per GPU.
+Your node must run Mercatura Core v0.1.3 or newer.
+
+NEW IN v0.5.4:
+  * The GPU kernel source is stored obfuscated inside the program, so it
+    no longer appears in the binary as plain text. This changes nothing
+    about how the miner runs, its speed or its options.
+
+NEW IN v0.5.3:
+  * tools/gpu-autotune takes --fan PERCENT (30-100) to hold the fan at a
+    fixed speed for the whole test; it returns to automatic at the end.
+        sudo ./tools/run-autotune.sh --fan 90        (Linux, every GPU)
+        gpu-autotune.exe 0 --fan 90                  (Windows, as Admin)
+
+NEW IN v0.5.2 (about 2x faster on V2):
+  * MercaHash V2 now runs 16 lanes per work-group with 16 bind threads
+    by default (--gpu-group-size 16 --gpu-bind-threads 16). Measured in
+    Nov 2026, same cards, same clocks:
+        RTX 3090 Ti   4,565 ->  9,784 H/s     RTX 3090   4,357 -> 9,341
+        RTX 3080      3,015 ->  5,330 H/s     RTX 3060 Ti 2,250 -> 3,907
+        RTX 2070      1,560 ->  3,222 H/s     RX 6800 XT  2,387 -> 4,158
+        RX 5700 XT    1,044 ->  2,268 H/s
+    V1 keeps its old defaults (group 1, 32 bind threads), which were the
+    fastest for V1. If your flight sheet already has --gpu-group-size 16
+    --gpu-bind-threads 16 you can leave it or remove it.
+  * --gpu-group-size, --gpu-bind-threads and --gpu-fill-group are now
+    per-GPU lists like the other options ("16,8,16", "auto" or an empty
+    slot = the default for the MercaHash version).
+
+NEW IN v0.5.1 (AMD cards):
+  * --gpu-max-temp now works on AMD cards on Linux (read from the amdgpu
+    driver). On Windows it still works on NVIDIA cards only.
+  * Temperature, power, clocks and fan of AMD cards on Linux appear in the
+    status lines, the SRBMiner-style table and the API.
+  * The SRBMiner-style table numbers cards the way mining OSes do (NVIDIA
+    first, then AMD, each in PCI slot order), so mixed rigs show each
+    card's hashrate on the right card.
+  * The automatic lane count leaves more memory free on AMD cards
+    (at least 1792 MiB); an RX 5700 XT now works without --gpu-lanes.
+  * Per-GPU lists may leave a slot empty: --gpu-lanes ,50, means
+    auto,50,auto, and --gpu-cclock 1800,,1750 leaves the middle GPU's
+    clock alone.
+
+
+------------------------------------------------------------------------------
+ CONTENTS
+------------------------------------------------------------------------------
+
+  1.  Quick start
+  2.  What you need
+  3.  How options are written (lists, priorities, the config file)
+  4.  Connection options
+  5.  Choosing GPUs
+  6.  Per-GPU performance options
+  7.  Temperature protection
+  8.  NVIDIA clock, power and fan control
+  9.  Monitoring: status lines, log file, statistics API
+  10. Safety options
+  11. Tools: list devices, self-test, benchmark
+  12. Advanced options
+  13. Example command lines
+  14. Reading the output
+  15. Exit codes
+  16. Troubleshooting
+
+
+------------------------------------------------------------------------------
+ 1. QUICK START
+------------------------------------------------------------------------------
+
+  1. Make sure your Mercatura Core node is running, synced, and has RPC
+     enabled (section 2).
+  2. List your GPUs:
+        Windows:  mercaminer-gpu.exe --list-devices
+        Linux:    ./mercaminer --list-devices
+  3. Edit the four settings at the top of start-mining.bat (Windows) or
+     start.sh (Linux): node address, wallet, RPC login, extra options.
+  4. Run start-mining.bat / ./start.sh. Stop with Ctrl+C.
+
+  Mining OS / launcher users: give the launcher the command line from
+  section 13. The miner does not need a config file.
+
+
+------------------------------------------------------------------------------
+ 2. WHAT YOU NEED
+------------------------------------------------------------------------------
+
+  * A GPU driver with OpenCL.
+      Windows: the normal NVIDIA/AMD/Intel driver includes it.
+      Ubuntu:  sudo apt install ocl-icd-libopencl1 nvidia-opencl-icd-<ver>
+               (or libnvidia-compute-<ver>). Check with --list-devices:
+               every card must show as GPU.
+  * GPU memory: 128 MiB per lane for MercaHash V1 (a 24 GB card runs
+    ~170 lanes, an 8 GB card ~55) and 16 MiB per lane for MercaHash V2
+    (about 8x as many lanes).
+  * A synced Mercatura Core node with RPC enabled. In the node's
+    mercatura.conf, inside the [test] section for testnet:
+
+        server=1
+        rpcuser=miner
+        rpcpassword=<a long random password>
+        # only if the miner runs on another computer:
+        rpcbind=0.0.0.0
+        rpcallowip=192.168.1.0/24
+        # recommended when several miners share the node:
+        rpcthreads=64
+        rpcworkqueue=256
+
+    Restart the node after editing. Never forward the RPC port (27775
+    testnet, 27776 mainnet) on your router.
+  * Linux: any 64-bit distribution with glibc 2.17 or newer (Ubuntu 18.04
+    through 26.04). The program is self-contained.
+
+
+------------------------------------------------------------------------------
+ 3. HOW OPTIONS ARE WRITTEN
+------------------------------------------------------------------------------
+
+  Both forms work:   --gpu-lanes 176      --gpu-lanes=176
+
+  Short forms:  -a = --algorithm   -o = --pool      -u = --wallet
+                -p = --password    -w = --worker    -h = --help
+
+  PER-GPU LISTS. Options marked "LIST" take either one value for every GPU
+  or one value per GPU, separated by commas, in the order of --gpu-id:
+
+      --gpu-id 0,1,2 --gpu-lanes 55,55,auto --gpu-max-temp 71,71,75
+
+  Here GPU 0 and 1 get 55 lanes and a 71 C limit; GPU 2 gets the automatic
+  lane count and a 75 C limit. A list with the wrong number of values (for
+  example 2 values for 3 GPUs) is an error, so nothing is guessed.
+
+  An empty slot means "automatic" for lane lists and "leave unchanged"
+  for clock/power/fan lists:
+      --gpu-lanes ,50,          same as auto,50,auto
+      --gpu-cclock 1800,,1750   GPU 1's core clock is not touched
+  Without commas a single value applies to EVERY GPU: --gpu-lanes 50
+  gives all cards 50 lanes.
+
+  GPU NUMBERS. Lists follow the miner's own numbering, shown by
+  --list-devices (OpenCL order). On mixed AMD + NVIDIA rigs this can
+  differ from the numbers your mining OS shows; always check with
+  --list-devices before writing a per-GPU list.
+
+  PRIORITY. Settings come from, highest first:
+      1. the command line
+      2. mercaminer.conf (optional)
+      3. built-in defaults
+  So a command line can override any single setting in mercaminer.conf.
+
+  THE CONFIG FILE IS OPTIONAL. If you prefer a file, copy
+  mercaminer.conf.example to mercaminer.conf. Each setting has a config
+  key, written as key=value, one per line; "#" starts a comment. Most keys
+  are the option name without "--" and with "_" instead of "-" (for
+  example --gpu-max-temp 71 becomes gpu_max_temp=71). The exceptions are
+  listed with each option below (--pool is rpc_url, --wallet is
+  payout_address, --password is rpc_login, --gpu-id is gpu_devices,
+  --disable-gpu-id is gpu_disable). The tools (--list-devices,
+  --selftest, --benchmark, --version, --help) are command-line only. The miner looks for it in:
+      1. the file given with --config FILE
+      2. mercaminer.conf in the current folder
+      3. mercaminer.conf next to the program
+      4. ~/.mercaminer/mercaminer.conf (Linux) or
+         %USERPROFILE%\.mercaminer\mercaminer.conf (Windows)
+  It prints "Using configuration file ..." when it finds one.
+
+  MISTAKES STOP THE MINER BEFORE IT TOUCHES THE GPU, with a message that
+  names the bad option (exit code 2). Unknown options, a value missing,
+  the same option given twice, or out-of-range values are all reported.
+
+
+------------------------------------------------------------------------------
+ 4. CONNECTION OPTIONS
+------------------------------------------------------------------------------
+
+  -a, --algorithm NAME
+      The algorithm to mine. Only "mercahash" is supported ("MercaHash V1",
+      "mercahash-v1" and similar spellings are accepted). Optional; it
+      exists so launchers that always pass an algorithm work. Any other
+      algorithm name is refused so you never mine the wrong coin by
+      accident.
+
+  -o, --pool URL
+      Address of YOUR Mercatura node's RPC port, not a pool. Examples:
+          http://127.0.0.1:27775       node on this computer (testnet)
+          http://192.168.1.100:27775    node on another computer (testnet)
+          192.168.1.100:27775           "http://" is added automatically
+      Testnet RPC port is 27775, mainnet 27776. stratum+tcp:// addresses
+      are refused: MercaMiner mines solo.
+      If you leave --pool out, the miner uses the node on this computer
+      and logs in with the node's .cookie file automatically (the miner
+      must then run as the same user as the node).
+      Config key: rpc_url
+
+  -u, --wallet ADDRESS[.NAME]   (also --user)
+      Your Mercatura address that receives the block rewards:
+          tmca1...  testnet          mca1...  mainnet
+          mcrt1...  regtest (testing)
+      The miner checks the address with the node before it starts.
+      Anything after a dot is used as the worker name, so
+      tmca1abc...xyz.myrig pays tmca1abc...xyz and names the rig "myrig"
+      (this is how most mining OSes pass the rig name).
+      Required for mining.
+      Config key: payout_address
+
+  -p, --password USER:PASSWORD   (also --pass)
+      The node's RPC login: the rpcuser and rpcpassword from the node's
+      mercatura.conf, joined by a colon, e.g. miner:Xk29fhs8s. Required
+      together with --pool unless you use --cookie-file.
+      A password without a colon (such as "x", which many launchers send
+      by default) is ignored.
+      Config key: rpc_login
+
+  --cookie-file FILE
+      Log in with the node's .cookie file instead of a password. Only
+      useful when the miner runs on the same computer as the node (or the
+      file is shared). Typical locations:
+          Linux testnet:    ~/.mercatura/testnet/.cookie
+          Windows testnet:  %LOCALAPPDATA%\Mercatura\testnet\.cookie
+      The cookie changes every time the node restarts; the miner reloads it
+      automatically.
+      Config key: cookie_file
+
+  -w, --worker NAME
+      A name for this rig. It is shown at startup and reported by the API
+      (rig_name). It does not affect mining. Default: the wallet's ".NAME"
+      suffix if any, otherwise the computer's name.
+      Config key: worker
+
+  --network main|test|regtest
+      Which Mercatura network to mine. Normally you do not need this: the
+      miner works it out from the wallet address (tmca1 = test, mca1 =
+      main, mcrt1 = regtest). The miner also checks that the node is on
+      the same network (genesis block) and refuses to mine otherwise.
+      Config key: network
+
+  --template-refresh SECONDS
+      Fetch fresh work from the node at least this often, even when no new
+      block arrived. Default 30. 0 = only when a new block arrives.
+      On testnet the miner also refreshes exactly when the "minimum
+      difficulty" window opens (a block may use the lowest difficulty once
+      the previous block is more than 5 minutes old), so you get those
+      easy blocks as soon as they are allowed.
+      Config key: template_refresh
+
+  --mercahash-v2-height N|never
+      First block height mined with MercaHash V2. Default: 17000 on testnet
+      (Mercatura Core v0.1.3), V1 only on mainnet and regtest. Only change
+      it if the developer announces a different switch height, or for
+      testing on regtest (match the node's -mercahashv2height). "never"
+      keeps V1. The miner reads the height of every block it works on and
+      uses the right version automatically; a wrong setting makes the node
+      reject your blocks.
+      Config key: mercahash_v2_height
+
+
+------------------------------------------------------------------------------
+ 5. CHOOSING GPUS
+------------------------------------------------------------------------------
+
+  --gpu-id LIST   (also --gpu-devices)
+      Which GPUs to mine on, by the index shown by --list-devices.
+          --gpu-id 0         only the first GPU
+          --gpu-id 0,2       first and third
+      Default: every device that is a GPU. The order you give here is the
+      order used by every per-GPU LIST option.
+      Config key: gpu_devices (value "all" or a list)
+
+  --disable-gpu-id LIST
+      GPUs to leave out, e.g. --disable-gpu-id 1 mines on every GPU except
+      GPU 1 (handy for a card that drives your monitor). Applied after
+      --gpu-id.
+      Config key: gpu_disable
+
+  --list-devices
+      Print every OpenCL device with its index, memory, driver and
+      suggested lane count, plus current power/temperature/clocks for
+      NVIDIA cards and (on Linux) AMD cards, then exit. Needs no node and
+      no wallet.
+
+
+------------------------------------------------------------------------------
+ 6. PER-GPU PERFORMANCE OPTIONS
+------------------------------------------------------------------------------
+
+  --gpu-lanes LIST
+      How many hashes each GPU works on at the same time. Each lane needs
+      its own 128 MiB scratchpad in GPU memory, so lanes are limited by
+      memory, not by GPU power.
+      "auto" (the default) uses as many lanes as fit while leaving some
+      memory free for the driver and desktop (10% of the card, at least
+      512 MiB on NVIDIA and 1792 MiB on AMD - AMD's ROCm driver needs more
+      for itself and fails with "HSA exception: ... alloc failed" when the
+      card is too full; if you see that, lower the lane count).
+      More lanes = more hashrate, until memory runs out. When GPU memory
+      is nearly full, Windows silently moves part of it to system RAM and
+      the hashrate DROPS sharply instead of failing. So:
+        * Test a higher value for 10-15 minutes while really mining and
+          watch the [gpu N] line. If the hashrate falls, go back down.
+        * The desktop, browsers and video players also use GPU memory; a
+          card that drives a monitor fits fewer lanes.
+      Measured example: RTX 3090 Ti (24 GB) on Windows: 172 lanes ~330
+      H/s at 2000 MHz, 176 lanes slightly faster, 186 lanes was faster in
+      a short benchmark but SLOWER (~290 H/s) while mining with the
+      desktop running.
+      This setting is for MercaHash V1 only; V2 uses --gpu-lanes-v2.
+      Values: auto or 1-4096.
+      Config key: gpu_lanes
+
+  --gpu-lanes-v2 LIST
+      The same for MercaHash V2, where each lane needs only 16 MiB, so
+      about 8 times as many lanes fit (a 24 GB card ~1,380 by default).
+      "auto" (the default) is a good start; test changes with
+      --benchmark (which uses V2 by default) and while really mining.
+      With V2 the GPU's memory speed and core count matter more than
+      with V1, so tune again rather than reusing V1 numbers.
+      Values: auto or 1-4096.
+      Config key: gpu_lanes_v2
+
+  --gpu-kernel LIST
+      Which version of the GPU program to use. Default 4 (fastest tested).
+          1  reference version (slow; for checking only)
+          2  optimized
+          3  2 + several threads share one hash's "bind" step
+          4  3 + memory prefetching - DEFAULT, best on NVIDIA tested
+          5  4 + 4 threads share the "fill" step (local memory)
+          6  5 using NVIDIA warp shuffles (NVIDIA only)
+      With V2's default group size 16, kernel 4 was the fastest on every
+      tested card (RTX 2070, 3060 Ti, 3080, 3090, 3090 Ti, RX 5700 XT,
+      RX 6800 XT). Use tools/gpu-bench to compare on your card.
+      Config key: gpu_kernel
+
+
+------------------------------------------------------------------------------
+ 7. TEMPERATURE PROTECTION
+------------------------------------------------------------------------------
+
+  --gpu-max-temp LIST   (also --gpu-off-temperature)
+      Pause a GPU when it reaches this temperature in C. Only that GPU
+      pauses; the others keep mining. 0 = off (default). Allowed: 40-100.
+          --gpu-max-temp 71
+      The GPU resumes automatically once it has cooled down (see below).
+      Needs a temperature reading:
+        * NVIDIA cards: from the NVIDIA driver (NVML), Windows and Linux.
+        * AMD cards on Linux: from the amdgpu driver (no root needed).
+          The limit uses the "edge" GPU temperature, the main temperature
+          mining dashboards show. The hotter "junction"/hotspot reading is
+          shown as "hot" in the status line but does not trigger a pause.
+        * AMD cards on Windows and other cards: no reading. At startup the
+          miner prints "temperature limit: NOT ACTIVE" for such a card -
+          use your driver's or mining OS's own limit there.
+      The startup lines "GPU N temperature limit: 71 C" list exactly the
+      cards that are protected.
+      Config key: gpu_max_temp
+
+  --gpu-resume-temp LIST
+      Resume a paused GPU at or below this temperature. Must be lower than
+      --gpu-max-temp. Default: 4 C below the limit (71 -> 67).
+      Config key: gpu_resume_temp
+
+  Tip: the pause/resume limit protects the card, but a fan curve or lower
+  power limit that keeps it below the limit gives steadier hashrate. A
+  fixed fan speed is available with --gpu-fan (section 8).
+
+
+------------------------------------------------------------------------------
+ 8. NVIDIA CLOCK, POWER AND FAN CONTROL
+------------------------------------------------------------------------------
+
+  These use the NVIDIA driver's management library (NVML). On Windows the
+  miner must run as Administrator (use start-mining-admin.bat). On Linux,
+  root is needed and some settings depend on the driver. Every setting is
+  put back to what it was when the miner exits (Ctrl+C or closing the
+  window). Mining OSes usually manage clocks themselves - in that case do
+  NOT use these options; let the OS do it.
+
+  All are LIST options (one value for all GPUs or one per GPU).
+
+  --gpu-cclock LIST     Lock the core clock, in MHz, e.g. 2000.
+      MercaHash is limited by the core clock, so this matters most.
+      Too high gives wrong hashes (see "live check", section 14). RTX 3090
+      Ti results: 2100 MHz ~349 H/s (rare errors), 2000 MHz ~335 H/s (no
+      errors) - 2000 is the recommended setting there. Lower clocks are
+      much more efficient: 1500 MHz gave ~242 H/s at ~106 W.
+      Range 200-4000.
+
+  --gpu-mclock LIST     Lock the memory clock, in MHz. Lowering it costs
+      some hashrate (about 5-11% at the lowest step) and saves power.
+      Range 200-15000.
+
+  --gpu-coffset LIST    Core clock offset in MHz, e.g. -100. Range
+      -1000..1000. Usually --gpu-cclock is the better tool.
+
+  --gpu-moffset LIST    Memory clock offset in MHz. Range -3000..3000.
+
+  --gpu-plimit LIST     Power limit in watts, e.g. 250. Must be within the
+      card's allowed range (shown by --list-devices). Range 30-1000.
+
+  --gpu-fan LIST        Fixed fan speed in percent, e.g. 75. Range 0-100.
+      When the miner exits the fan returns to automatic control.
+
+  --gpu-reset-oc        Reset clocks, offsets, power limit and fans to the
+      driver defaults before applying the options above.
+
+  Config keys: gpu_cclock, gpu_mclock, gpu_coffset, gpu_moffset,
+  gpu_plimit, gpu_fan, gpu_reset_oc=true
+
+
+------------------------------------------------------------------------------
+ 9. MONITORING
+------------------------------------------------------------------------------
+
+  --report-interval SECONDS
+      How often to print the status lines (section 14). Default 30.
+      0 = no periodic status lines.
+      Config key: report_interval
+
+  --log-file FILE
+      Also write everything the miner prints to FILE, with the date and
+      time at the start of each line. The file is appended to, never
+      overwritten. A relative name is relative to the folder the miner is
+      started from (start-mining.bat / start.sh start it in its own
+      folder). Example: --log-file miner.log
+      Config key: log_file
+
+  --api-enable
+      Start a small read-only web server with live statistics in JSON, for
+      dashboards and mining OS agents. It never accepts commands.
+      Config key: api_enable=true
+
+  --api-port PORT
+      Port of the statistics API. Default 21550 (the same default as
+      SRBMiner). Use a different port per miner if several run on one
+      computer. If the port is already taken the miner stops with a
+      message instead of running without its API.
+      Config key: api_port
+
+  --api-bind ADDRESS
+      Who may read the API:
+          127.0.0.1   (default) only programs on this computer
+          0.0.0.0     any computer on your network
+      The API shows your wallet address, node address and statistics. It
+      never shows your RPC password.
+      Config key: api_bind
+
+  Reading the API: open http://127.0.0.1:21550/ in a browser, or
+      curl http://127.0.0.1:21550/
+  Any path returns the same JSON. Main fields:
+      miner, miner_version, rig_name, algorithm, mining_time (seconds)
+      hashrate.total      H/s over the last 30 seconds, all GPUs
+      hashrate.average    H/s since start
+      power, efficiency   total watts and H/s per watt (NVIDIA; else null)
+      blocks.accepted     blocks you found that the node accepted
+      blocks.rejected     blocks the node refused (should stay 0)
+      blocks.stale        blocks you found too late (someone else's block
+                          for the same height won the race)
+      blocks.network_blocks
+                          new blocks found by others while you mined (each
+                          one just means "switch to new work"; no loss)
+      live_check          GPU results re-checked on the CPU (verified,
+                          wrong) - see section 14
+      pool.connected      false while the node cannot be reached
+      pool.height         block height being mined
+      gpu_devices[]       per GPU: device_id, model, bus_id, lanes,
+                          kernel, hashrate, hashrate_average, temperature,
+                          power, fan_speed, core_clock, memory_clock,
+                          efficiency, live_checked, live_errors,
+                          paused_hot, disabled
+      algorithms[]        the same totals in SRBMiner's layout
+                          (hashrate.gpu.gpu0, hashrate.gpu.total,
+                          shares.accepted/rejected) for tools that
+                          already read SRBMiner. Here a "share" is a block.
+
+
+------------------------------------------------------------------------------
+ 10. SAFETY OPTIONS
+------------------------------------------------------------------------------
+
+  Always on (no option needed):
+    * Every block a GPU finds is re-hashed on the CPU before it is sent to
+      the node, so an unstable GPU can never submit a bad block.
+    * "Live check": one result from every GPU batch is re-hashed on the
+      CPU in the background and counted as verified or wrong.
+    * If the GPU driver fails, the miner rebuilds the GPU, re-runs the
+      self-test and carries on (up to 5 times in a row, 10 seconds apart).
+    * Connection problems with the node are retried every second; mining
+      resumes by itself when the node is back.
+    * NVIDIA clock/power/fan settings are restored on exit.
+
+  --max-live-errors N
+      Take a GPU out of service after N wrong live-check results (it stays
+      idle until the miner is restarted; the other GPUs keep mining). If
+      every GPU is taken out, the miner stops with exit code 1 so a
+      watchdog can restart it. 0 = never (default): wrong hashes are
+      already harmless thanks to the CPU re-check, they only waste a
+      little hashrate. Any wrong result means the core clock is too high.
+      Config key: max_live_errors
+
+  --block-limit N
+      Stop after N accepted blocks. 0 = run forever (default).
+      Config key: block_limit
+
+
+------------------------------------------------------------------------------
+ 11. TOOLS
+------------------------------------------------------------------------------
+
+  None of these need a node, a wallet or a password.
+
+  --list-devices
+      See section 5.
+
+  --selftest
+      Compile the GPU program on every selected GPU, check it against the
+      official MercaHash test vector and cross-check the first and last
+      lanes of every GPU memory block against the CPU, then exit (code 0 =
+      passed). The same test runs automatically every time mining starts
+      and whenever the miner switches between V1 and V2. Uses --gpu-id,
+      --gpu-lanes / --gpu-lanes-v2, --gpu-kernel, --pow-version and the
+      clock options, so it also checks that a new clock setting is correct.
+
+  --benchmark
+      Mine a dummy block that can never be solved, for --benchmark-time
+      seconds, and print each GPU's hashrate, watts, H/s per watt, maximum
+      temperature and live-check result. The first ~10 seconds are left
+      out of the result (warm-up). Uses every per-GPU, temperature and
+      clock option, so it is the easiest way to compare settings, e.g.
+          --benchmark --gpu-lanes-v2 1200
+          --benchmark --gpu-lanes-v2 1380
+          --benchmark --pow-version 1 --gpu-lanes 172
+      Exit code 3 if any wrong hash was found (clock too high).
+
+  --pow-version 1|2
+      Which MercaHash version --selftest and --benchmark use. Default 2.
+      (Mining itself always follows the block height; see
+      --mercahash-v2-height.)
+      Config key: pow_version
+
+  --benchmark-time SECONDS
+      Length of --benchmark. Default 60, allowed 10-86400.
+
+  --version     Print the version and exit.
+  --help        Print a summary of all options and exit.
+
+  The tools folder also holds the separate diagnostic programs from
+  earlier versions: gpu-bench (compares kernel settings), gpu-stress
+  (cross-checks two kernels on every lane) and gpu-autotune (tries core
+  and memory clock locks on NVIDIA GPUs, including the low 810 MHz memory
+  step where the card allows it, and reports the fastest and the most
+  efficient error-free settings). Cards that cannot lock memory (RTX 20
+  series and older) or cannot lock 810 MHz get a note and are tested
+  without it. All three tools test MercaHash V2 by default; add
+  --pow 1 to gpu-autotune (or set MERCAHASH_VERSION=1 for gpu-bench /
+  gpu-stress) to test V1. Windows: run-autotune.bat (asks for
+  Administrator). Linux: sudo ./run-autotune.sh (every GPU in turn, or
+  e.g. sudo ./run-autotune.sh 1 for one GPU by its --gpu-id number;
+  results are saved to autotune-gpuN.txt). Stop the miner before running
+  any of them.
+
+
+------------------------------------------------------------------------------
+ 12. ADVANCED OPTIONS
+------------------------------------------------------------------------------
+
+  You should not need these; the defaults are the fastest tested.
+
+  --gpu-group-size LIST         Lanes per OpenCL work-group, 1-256 or
+      auto. Default auto = 16 for MercaHash V2, 1 for V1. This matters a
+      lot: on V2, group 16 was about 2x faster than group 1 on every
+      tested card; 32 and 64 were slower again. (gpu_group_size)
+  --gpu-bind-threads LIST       Threads per hash in kernel 3-6's bind
+      step: 16, 32, 64 or auto. Default auto = 16 for V2, 32 for V1.
+      (gpu_bind_threads)
+  --gpu-fill-group LIST         Lanes per work-group in kernel 5/6's fill
+      step: 1, 2, 4, 8, 16, 32, 64 or auto. Default 8. (gpu_fill_group)
+  --gpu-layout contiguous|interleaved   Scratchpad memory layout. Default
+      contiguous (interleaved was slower on every tested card).
+      (gpu_layout)
+
+  Compare settings on one card with tools/gpu-bench (stop the miner
+  first), e.g. GPU 0 with automatic lanes:
+      ./gpu-bench 0 0 v4/g16/b16/c,v4/g8/b32/c,v4/g1/b32/c
+  Each item is kernel/group/bind-threads[/fFILL]/c (c = contiguous).
+  --backend gpu|cpu             Mine on GPUs (default) or the CPU.
+      (backend)
+  --threads N                   CPU threads for --backend cpu. (threads)
+  --config FILE  (also --config-file)   Read settings from FILE instead of
+      searching for mercaminer.conf.
+  --disable-cpu                 Accepted for SRBMiner-style launchers; has
+      no effect (the GPU backend never mines on the CPU).
+
+
+------------------------------------------------------------------------------
+ 13. EXAMPLE COMMAND LINES
+------------------------------------------------------------------------------
+
+  (On Windows put the command on one line, or end lines with ^ in a .bat
+  file. On Linux end lines with \ . Replace the address and password with
+  your own.)
+
+  One RTX 3090 Ti on Windows, node in a VM on the same PC, temperature
+  limit, clocks locked (run as Administrator), API on:
+    mercaminer-gpu.exe -a mercahash -o http://127.0.0.1:27775
+      -u tmca1YOUR_ADDRESS.pc -p miner:YOUR_RPC_PASSWORD
+      --gpu-lanes 176 --gpu-cclock 2000 --gpu-max-temp 71
+      --api-enable --log-file miner.log
+
+  Linux rig, node on another computer, all GPUs, mining OS controls clocks:
+    ./mercaminer -a mercahash -o http://192.168.1.100:27775
+      -u tmca1YOUR_ADDRESS.myrig -p miner:YOUR_RPC_PASSWORD
+      --gpu-max-temp 71 --api-enable
+
+  Mining OS "extra config arguments" style (wallet and worker from the
+  OS's own fields):
+    --algorithm mercahash --pool http://192.168.1.100:27775
+    --wallet %WAL%.%WORKER_NAME% --password miner:YOUR_RPC_PASSWORD
+    --api-enable --api-port 21550
+
+  Three GPUs with different memory sizes, skip GPU 3:
+    ./mercaminer -o http://192.168.1.100:27775 -u tmca1YOUR_ADDRESS
+      -p miner:YOUR_RPC_PASSWORD --gpu-id 0,1,2 --gpu-lanes 55,55,auto
+      --gpu-max-temp 71,71,75 --disable-gpu-id 3
+
+  Compare lane counts without mining:
+    mercaminer-gpu.exe --benchmark --gpu-lanes 172
+    mercaminer-gpu.exe --benchmark --gpu-lanes 176
+
+
+------------------------------------------------------------------------------
+ 14. READING THE OUTPUT
+------------------------------------------------------------------------------
+
+  At start-up the miner prints a summary: version, node, network, wallet,
+  worker and one line per GPU with its lanes, kernel and temperature
+  limit. Then, every --report-interval seconds:
+
+  [status] height=6412 workers=176 hashrate=335.10 H/s session_hashes=...
+           accepted=3 stale=0 rejected=0 network_blocks=41 uptime=01:12:00
+      height          block being mined
+      workers         total lanes on all GPUs
+      accepted        your blocks the node accepted
+      stale           blocks you found that lost a race (rare)
+      rejected        blocks the node refused (should be 0)
+      network_blocks  blocks found by other miners (normal; work switches)
+
+  [gpu 0] 335.2 H/s, 201 W, 52 C, core 2010 MHz, mem 10251 MHz, fan 75%,
+          1.67 H/s/W, live 0 wrong
+  [gpu] total 335.2 H/s at 201 W = 1.67 H/s per watt | live check 1210
+          verified, 0 wrong
+      Power, temperature, clocks and fan appear for NVIDIA cards.
+      "live N wrong": any number above 0 means that GPU is unstable at its
+      current clocks - lower its core clock. The block re-check means
+      nothing bad is ever submitted, but the GPU is wasting work.
+
+  After those lines comes a table in SRBMiner's console format, for
+  mining OSes and dashboards that read the miner's screen output:
+
+  #0  RTX 2070  98.90 H/s  104.0W  0.951  75%  59C  1905  6801  1  0  0
+  Hashrate 98.90 H/s  1  0  0
+      #N       GPU number in PCI slot order (the same numbering as
+               nvidia-smi), which can differ from the --gpu-id index
+      then     hashrate, watts, H/s per watt, fan, temperature, core and
+               memory clock (NVIDIA only)
+      last 3   blocks accepted, blocks rejected, live-check errors
+  The "Hashrate" line is the total. Dashboards that read the screen
+  output usually look only at the last ~25 lines; if yours flickers to 0
+  after a "Block accepted" message, use a shorter --report-interval
+  (e.g. 10).
+
+  "New block on the network; switching to new work" - someone (maybe
+  your other rig) found a block. Normal.
+  "Block accepted" - you found a block. It appears in your wallet as
+  immature and becomes spendable after 100 confirmations.
+
+
+------------------------------------------------------------------------------
+ 15. EXIT CODES
+------------------------------------------------------------------------------
+
+  0   finished normally (--block-limit reached, self-test passed,
+      benchmark without errors)
+  1   stopped by an error (GPU failed repeatedly, every GPU disabled by
+      --max-live-errors, ...)
+  2   a setting is wrong (message says which); nothing was started
+  3   --benchmark found wrong hashes
+  130 stopped with Ctrl+C;  143 stopped by a termination signal
+
+
+------------------------------------------------------------------------------
+ 16. TROUBLESHOOTING
+------------------------------------------------------------------------------
+
+  "RPC startup connection failed ... timeout" or "connection refused"
+      The node is not reachable. Check that it is running, that --pool has
+      the right IP and port, that the node has rpcbind=0.0.0.0 and
+      rpcallowip for your network, and that the node computer's firewall
+      allows the port (e.g. sudo ufw allow from 192.168.1.0/24 to any port
+      27775 proto tcp).
+
+  "HTTP 401" / "Unauthorized"
+      Wrong --password. It must be rpcuser:rpcpassword from the node's
+      mercatura.conf.
+
+  "HTTP 503" / "Work queue depth exceeded"
+      The node ran out of RPC worker threads. Add rpcthreads=64 and
+      rpcworkqueue=256 to the node's mercatura.conf and restart it.
+
+  "RPC node reports chain 'main' but MercaMiner expected 'test'" (or a
+  "genesis hash does not match" message)
+      The node is on a different network than your wallet address. Use a
+      tmca1 address with a testnet node, mca1 with mainnet.
+
+  "no OpenCL GPU found"
+      Install or update the GPU driver (Linux: the OpenCL package, see
+      section 2). Run --list-devices.
+
+  Hashrate lower than expected / drops after a while
+      Too many lanes for the free GPU memory (section 6), the card is
+      pausing at --gpu-max-temp (look for "reached the ... C limit"), or
+      the clocks dropped (check core MHz in the [gpu] line).
+
+  "GPU N live check found a wrong hash"
+      Lower that GPU's core clock (--gpu-cclock or in your mining OS).
+
+  "API: cannot listen on ..."
+      Another program uses the port. Pick another with --api-port.
+
+  The mining OS dashboard shows 0 H/s
+      Turn on --api-enable and point the OS's agent at
+      http://127.0.0.1:21550/ (or the port you chose).
