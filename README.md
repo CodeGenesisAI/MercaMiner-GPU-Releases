@@ -4,14 +4,14 @@ Solo OpenCL GPU miner for **Mercatura (MCA)**: MercaHash V1 and V2, NVIDIA and
 AMD, Windows and Linux. This repository hosts the ready-to-run downloads and the
 user manual. It does not contain source code.
 
-## Download — v0.5.4
+## Download — v0.5.5
 
 | Platform | File |
 | --- | --- |
-| Windows (64-bit) | [`MercaMiner-GPU-v0.5.4-win64.zip`](downloads/v0.5.4/MercaMiner-GPU-v0.5.4-win64.zip) |
-| Linux (64-bit) | [`MercaMiner-GPU-v0.5.4-linux-x64.tar.gz`](downloads/v0.5.4/MercaMiner-GPU-v0.5.4-linux-x64.tar.gz) |
+| Windows (64-bit) | [`MercaMiner-GPU-v0.5.4-win64.zip`](downloads/v0.5.5/MercaMiner-GPU-v0.5.4-win64.zip) |
+| Linux (64-bit) | [`MercaMiner-GPU-v0.5.4-linux-x64.tar.gz`](downloads/v0.5.5/MercaMiner-GPU-v0.5.4-linux-x64.tar.gz) |
 
-SHA-256 checksums: [`downloads/v0.5.4/SHA256SUMS.txt`](downloads/v0.5.4/SHA256SUMS.txt).
+SHA-256 checksums: [`downloads/v0.5.5/SHA256SUMS.txt`](downloads/v0.5.5/SHA256SUMS.txt).
 On the file's page, use the **Download raw file** button (the download icon).
 
 The Linux build is portable (glibc 2.17+, so Ubuntu 18.04 and newer and the
@@ -21,7 +21,7 @@ DLLs. Unzip or untar it and run.
 ## Features
 
 - MercaHash **V1 and V2**, with an automatic switch at the fork height
-- **Solo** mining straight to your own Mercatura Core node — every block pays the full reward to your wallet, no pool, no fee
+- **Solo** mining straight to your own Mercatura Core node, no pool (a 5% developer fee applies — see below)
 - **Single-line** command style, per-GPU settings, optional config file
 - **NVIDIA + AMD**, multiple GPUs, automatic VRAM sizing
 - NVIDIA core/memory clock, power and fan control; per-GPU **temperature pause** (NVIDIA, and AMD on Linux)
@@ -57,6 +57,10 @@ the hashrate from the miner's console output or its JSON API (port
 
 The complete option reference, API fields and troubleshooting are in
 [**MANUAL.txt**](MANUAL.txt).
+
+## Developer fee
+
+This miner includes a **5% developer fee**: for about 5% of the time it is running, it mines to the developer's address instead of yours; the other 95% goes to your wallet. It is shown at startup on the `Dev fee:` line and noted in the log when it switches. On testnet this is testnet coins (no value); there is no fee on regtest; mainnet has no fee until Mercatura mainnet launches.
 
 ## License
 

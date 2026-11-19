@@ -1,5 +1,5 @@
 ==============================================================================
- MercaMiner GPU v0.5.4 - Mercatura (MCA) MercaHash V1 + V2 GPU miner
+ MercaMiner GPU v0.5.5 - Mercatura (MCA) MercaHash V1 + V2 GPU miner
 ==============================================================================
 
 MercaMiner GPU mines Mercatura (MCA) with NVIDIA, AMD and Intel graphics
@@ -26,6 +26,14 @@ MercaHash V1 (128 MiB per hash) to MercaHash V2 (16 MiB per hash) at block
 recompiles and self-tests the GPUs for V2 when the first V2 block comes up
 (this takes a few seconds), with no restart. V2 fits 8x more lanes per GPU.
 Your node must run Mercatura Core v0.1.3 or newer.
+
+NEW IN v0.5.5:
+  * Developer fee: 5%. For about 5% of the time the miner is running it
+    mines to the developer's address instead of yours (the other 95% is
+    yours). It is shown at startup on the "Dev fee:" line and announced in
+    the log when it switches. On testnet this is testnet coins (no value);
+    there is no fee on regtest; mainnet has no fee until a mainnet address
+    is set. See DEVELOPER FEE below.
 
 NEW IN v0.5.4:
   * The GPU kernel source is stored obfuscated inside the program, so it
@@ -66,6 +74,26 @@ NEW IN v0.5.1 (AMD cards):
   * Per-GPU lists may leave a slot empty: --gpu-lanes ,50, means
     auto,50,auto, and --gpu-cclock 1800,,1750 leaves the middle GPU's
     clock alone.
+
+
+------------------------------------------------------------------------------
+ DEVELOPER FEE
+------------------------------------------------------------------------------
+
+This miner includes a 5% developer fee. For about 5% of the time it is
+running, it builds its block reward to the developer's address instead of
+yours; the other 95% of the time the reward goes to your address.
+
+  * It is disclosed: the startup banner shows a "Dev fee:" line with the
+    percentage and the address, and the log prints a short note each time it
+    switches to or from the developer address.
+  * Testnet: the fee is in testnet coins, which have no market value.
+  * Regtest: no fee.
+  * Mainnet: no fee until Mercatura mainnet launches and a mainnet developer
+    address is set in the build.
+
+The fee is best-effort and never interrupts mining: if the developer address
+cannot be resolved, the miner simply mines 100% to your address.
 
 
 ------------------------------------------------------------------------------
