@@ -1,5 +1,5 @@
 ==============================================================================
- MercaMiner GPU v0.5.6 - Mercatura (MCA) MercaHash V1 + V2 GPU miner
+ MercaMiner GPU v0.5.7 - Mercatura (MCA) MercaHash V1 + V2 GPU miner
 ==============================================================================
 
 MercaMiner GPU mines Mercatura (MCA) with NVIDIA, AMD and Intel graphics
@@ -26,6 +26,16 @@ MercaHash V1 (128 MiB per hash) to MercaHash V2 (16 MiB per hash) at block
 recompiles and self-tests the GPUs for V2 when the first V2 block comes up
 (this takes a few seconds), with no restart. V2 fits 8x more lanes per GPU.
 Your node must run Mercatura Core v0.1.3 or newer.
+
+NEW IN v0.5.7:
+  * Cleaner, colour-coded console. By default the per-block detail, the
+    per-height "Mining height" lines and the machine-readable table are
+    hidden on screen, and "Block accepted" is a single line. Add --verbose
+    to show all of it again.
+  * The machine-readable table is still printed when the output is piped to
+    a mining dashboard or a file, so dashboards are unaffected.
+  * Log files written with --log-file are always plain text (no colour
+    codes, no symbols), whatever the console is doing.
 
 NEW IN v0.5.6:
   * The console is now colour-coded on an interactive terminal (Windows and
@@ -483,7 +493,17 @@ cannot be resolved, the miner simply mines 100% to your address.
       overwritten. A relative name is relative to the folder the miner is
       started from (start-mining.bat / start.sh start it in its own
       folder). Example: --log-file miner.log
+      The file is always plain text (no colour), even when the live console
+      is coloured.
       Config key: log_file
+
+  --verbose
+      Show the full detail on screen: every "Mining height" line, the full
+      multi-line "Block accepted" record (nonce, hashes, block hash), and
+      the machine-readable table. Off by default, which gives the clean,
+      compact view. The machine-readable table is always printed when the
+      output is piped to a dashboard or a file, so dashboards are unaffected
+      either way. Config key: verbose=true
 
   --api-enable
       Start a small read-only web server with live statistics in JSON, for

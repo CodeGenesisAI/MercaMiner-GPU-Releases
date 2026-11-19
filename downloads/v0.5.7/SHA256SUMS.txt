@@ -1,0 +1,2 @@
+c484edadf3ee631b8d01785d0aaa63fe7a1d66a6af51c693abf9795cc66f2308  MercaMiner-GPU-v0.5.7-win64.zip
+3de078313f604e42f0cf345b886ac82a3e8d3b096376b206ebe3f8c7d729bf78  MercaMiner-GPU-v0.5.7-linux-x64.tar.gz

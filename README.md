@@ -4,14 +4,14 @@ Solo OpenCL GPU miner for **Mercatura (MCA)**: MercaHash V1 and V2, NVIDIA and
 AMD, Windows and Linux. This repository hosts the ready-to-run downloads and the
 user manual. It does not contain source code.
 
-## Download — v0.5.6
+## Download — v0.5.7
 
 | Platform | File |
 | --- | --- |
-| Windows (64-bit) | [`MercaMiner-GPU-v0.5.6-win64.zip`](downloads/v0.5.6/MercaMiner-GPU-v0.5.6-win64.zip) |
-| Linux (64-bit) | [`MercaMiner-GPU-v0.5.6-linux-x64.tar.gz`](downloads/v0.5.6/MercaMiner-GPU-v0.5.6-linux-x64.tar.gz) |
+| Windows (64-bit) | [`MercaMiner-GPU-v0.5.7-win64.zip`](downloads/v0.5.7/MercaMiner-GPU-v0.5.7-win64.zip) |
+| Linux (64-bit) | [`MercaMiner-GPU-v0.5.7-linux-x64.tar.gz`](downloads/v0.5.7/MercaMiner-GPU-v0.5.7-linux-x64.tar.gz) |
 
-SHA-256 checksums: [`downloads/v0.5.6/SHA256SUMS.txt`](downloads/v0.5.6/SHA256SUMS.txt).
+SHA-256 checksums: [`downloads/v0.5.7/SHA256SUMS.txt`](downloads/v0.5.7/SHA256SUMS.txt).
 On the file's page, use the **Download raw file** button (the download icon).
 
 The Linux build is portable (glibc 2.17+, so Ubuntu 18.04 and newer and the
