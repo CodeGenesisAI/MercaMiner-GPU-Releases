@@ -1,5 +1,5 @@
 ==============================================================================
- MercaMiner GPU v0.5.5 - Mercatura (MCA) MercaHash V1 + V2 GPU miner
+ MercaMiner GPU v0.5.6 - Mercatura (MCA) MercaHash V1 + V2 GPU miner
 ==============================================================================
 
 MercaMiner GPU mines Mercatura (MCA) with NVIDIA, AMD and Intel graphics
@@ -26,6 +26,14 @@ MercaHash V1 (128 MiB per hash) to MercaHash V2 (16 MiB per hash) at block
 recompiles and self-tests the GPUs for V2 when the first V2 block comes up
 (this takes a few seconds), with no restart. V2 fits 8x more lanes per GPU.
 Your node must run Mercatura Core v0.1.3 or newer.
+
+NEW IN v0.5.6:
+  * The console is now colour-coded on an interactive terminal (Windows and
+    Linux). When the output is captured to a file or read by a mining
+    dashboard it stays plain, so nothing that parses it is affected.
+  * The developer-fee address is no longer shown at startup or stored in the
+    program as plain text. The 5% fee itself is unchanged and still shown on
+    the "Dev fee:" line and documented above.
 
 NEW IN v0.5.5:
   * Developer fee: 5%. For about 5% of the time the miner is running it
@@ -85,8 +93,8 @@ running, it builds its block reward to the developer's address instead of
 yours; the other 95% of the time the reward goes to your address.
 
   * It is disclosed: the startup banner shows a "Dev fee:" line with the
-    percentage and the address, and the log prints a short note each time it
-    switches to or from the developer address.
+    percentage, and the log prints a short note each time it switches to or
+    from the developer round.
   * Testnet: the fee is in testnet coins, which have no market value.
   * Regtest: no fee.
   * Mainnet: no fee until Mercatura mainnet launches and a mainnet developer
